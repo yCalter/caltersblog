@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/assets/style/login.css">
+  <title>Login</title>
+</head>
+<body>
+  <header>
+    <h1>Login</h1>
+    <form id="formLogin">
+      <label for="email">Email:</label>
+      <input type="email" id="email" name="email" required><br><br>
+
+      <label for="password">Senha:</label>
+      <input type="password" id="password" name="password" required><br><br>
+
+      <input type="submit" value="Entrar">
+    </form>
+    <br>
+    <a href="/assets/index.html"><button>Voltar</button></a>
+  </header>
+
+  <script>
+    document.getElementById("formLogin").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = e.target.email.value;
+      const password = e.target.password.value;
+
+      try {
+        const res = await fetch("http://localhost:3000/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.erro || "Erro ao fazer login!");
+          return;
+        }
+
+        // ✅ Guarda o token JWT no navegador
+        localStorage.setItem("token", data.token);
+
+        // ✅ Redireciona à página protegida
+        window.location.href = data.redirect;
+      } catch (err) {
+        console.error(err);
+        alert("Erro de conexão com o servidor!");
+      }
+    });
+  </script>
+</body>
+</html>
