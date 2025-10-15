@@ -13,21 +13,20 @@ const SECRET = process.env.JWT_SECRET || "seu_segredo_super_seguro";
 
 // Middlewares
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5500"], // Adicionei uma origem extra comum para Live Server; ajuste se necessário
+  origin: ["http://localhost:3000", "http://localhost:5500"], // Ajuste se necessário
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Conexão com MongoDB (removidas opções obsoletas e adicionado timeout maior)
+// Conexão com MongoDB
 mongoose.connect("mongodb://127.0.0.1:27017/blog_db", {
-  serverSelectionTimeoutMS: 30000 // Aumenta o timeout para 30 segundos
+  serverSelectionTimeoutMS: 30000
 })
   .then(() => console.log("✅ Conectado ao MongoDB"))
   .catch(err => console.error("❌ Erro ao conectar ao MongoDB:", err));
 
-// Logs adicionais para depuração da conexão
 mongoose.connection.on('connected', () => {
   console.log('✅ Mongoose conectado ao MongoDB');
 });
@@ -38,7 +37,7 @@ mongoose.connection.on('disconnected', () => {
   console.log('⚠️ Mongoose desconectado do MongoDB');
 });
 
-// --- Schema e model ---
+// Schema e model
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true, required: true },
@@ -46,15 +45,13 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 const User = mongoose.model("User", userSchema);
 
-// --- Middleware de autenticação com JWT (verifica cookie ou header) ---
+// Middleware de autenticação
 function authenticate(req, res, next) {
-  // 1) tenta cookie
   const tokenFromCookie = req.cookies && req.cookies.token;
-  // 2) tenta header Authorization
   const authHeader = req.headers.authorization;
   const tokenFromHeader = authHeader && authHeader.split(" ")[1];
-
   const token = tokenFromCookie || tokenFromHeader;
+
   if (!token) {
     return res.status(401).json({ erro: "Token ausente. Faça login primeiro!" });
   }
@@ -68,20 +65,19 @@ function authenticate(req, res, next) {
   }
 }
 
-// --- Servir arquivos estáticos PUBLIC (CSS, JS, imagens, index, login, registrar) ---
-// public root é a pasta "assets" (um nível acima de __dirname)
-const PUBLIC_DIR = path.join(__dirname, ".."); // points to .../assets
+// Servir arquivos estáticos
+const PUBLIC_DIR = path.join(__dirname, ".."); // Refere-se a 'assets/'
 app.use("/assets", express.static(PUBLIC_DIR, {
   index: false,
   extensions: ["html", "css", "js"]
 }));
 
-// --- Rota inicial (página index na pasta assets) ---
+// Rota inicial
 app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
-// --- API: registrar ---
+// API: registrar
 app.post("/registrar", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -102,8 +98,7 @@ app.post("/registrar", async (req, res) => {
   }
 });
 
-// --- API: login ---
-// Ao logar: cria token, envia em JSON e também seta cookie httpOnly para navegações normais
+// API: login
 app.post("/login", async (req, res) => {
   console.log("Requisição recebida em /login:", req.body);
   try {
@@ -127,22 +122,19 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ erro: "Senha incorreta!" });
     }
 
-    // Cria token JWT
     const token = jwt.sign({ id: user._id, email: user.email, name: user.name }, SECRET, { expiresIn: "2h" });
     console.log("Token gerado para usuário:", email);
 
-    // Seta cookie seguro (httpOnly) para ser enviado automaticamente em navegações
-    // Em dev, 'secure' deve ser false se não usar HTTPS
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false,   // em produção com HTTPS => true
+      secure: false,
       sameSite: "lax",
-      maxAge: 2 * 60 * 60 * 1000 // 2 horas
+      maxAge: 2 * 60 * 60 * 1000
     });
 
     return res.json({
       mensagem: "Login realizado com sucesso!",
-      token,                         // opcional (frontend pode usar localStorage também)
+      token,
       redirect: "/willkommen"
     });
   } catch (err) {
@@ -151,26 +143,23 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// --- Rota protegida: /willkommen (arquivo protegido, fora da pasta pública) ---
-// IMPORTANTE: mova 'willkommen.html' para a raiz do projeto (um nível acima de assets)
+// Rota protegida: /willkommen
 app.get("/willkommen", authenticate, (req, res) => {
-  // envia o HTML protegido que está em: LEASON2/willkommen.html
-  return res.sendFile(path.join(__dirname, "..", "willkommen.html"));
+  return res.sendFile(path.join(PUBLIC_DIR, "willkommen.html"));
 });
 
-// --- API para checar token (opcional, útil no front-end) ---
+// API para checar token
 app.get("/api/me", authenticate, (req, res) => {
-  // Retorna dados básicos do usuário (sem expor senha)
   return res.json({ id: req.user.id, email: req.user.email, name: req.user.name });
 });
 
-// --- Logout (limpa cookie) ---
+// Logout
 app.post("/logout", (req, res) => {
   res.clearCookie("token");
   return res.json({ mensagem: "Logout realizado com sucesso!" });
 });
 
-// --- Inicia o servidor ---
+// Inicia o servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
