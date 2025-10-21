@@ -1,3 +1,4 @@
+// assets/script/server.js
 const express = require("express");
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -10,6 +11,7 @@ const app = express();
 const PORT = 3000;
 const SECRET = process.env.JWT_SECRET || "seu_segredo_super_seguro";
 
+// Middlewares
 app.use(cors({
   origin: ["http://localhost:3000", "http://localhost:5500"],
   credentials: true
@@ -18,22 +20,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Conexão com MongoDB
 mongoose.connect("mongodb://127.0.0.1:27017/blog_db", {
   serverSelectionTimeoutMS: 30000
 })
-  .then(() => console.log(" Conectado ao MongoDB"))
-  .catch(err => console.error(" Erro ao conectar ao MongoDB:", err));
+  .then(() => console.log("✅ Conectado ao MongoDB"))
+  .catch(err => console.error("❌ Erro ao conectar ao MongoDB:", err));
 
 mongoose.connection.on('connected', () => {
-  console.log(' Mongoose conectado ao MongoDB');
+  console.log('✅ Mongoose conectado ao MongoDB');
 });
 mongoose.connection.on('error', (err) => {
-  console.error(' Erro na conexão com o MongoDB:', err);
+  console.error('❌ Erro na conexão com o MongoDB:', err);
 });
 mongoose.connection.on('disconnected', () => {
-  console.log(' Mongoose desconectado do MongoDB');
+  console.log('⚠️ Mongoose desconectado do MongoDB');
 });
 
+// Schema e model
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true, required: true },
@@ -61,15 +65,16 @@ function authenticate(req, res, next) {
   }
 }
 
+// Servir arquivos estáticos
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
-console.log("PUBLIC_DIR =", PUBLIC_DIR);
-
 app.use(express.static(PUBLIC_DIR));
 
+// Página inicial
 app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
+// Registro
 app.post("/registrar", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -90,31 +95,19 @@ app.post("/registrar", async (req, res) => {
   }
 });
 
+// Login
 app.post("/login", async (req, res) => {
-  console.log("Requisição recebida em /login:", req.body);
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      console.log("Campos incompletos:", { email, password });
-      return res.status(400).json({ erro: "Preencha todos os campos!" });
-    }
+    if (!email || !password) return res.status(400).json({ erro: "Preencha todos os campos!" });
 
-    console.log("Buscando usuário com email:", email);
     const user = await User.findOne({ email });
-    console.log("Resultado da busca:", user);
-    if (!user) {
-      console.log("Usuário não encontrado para email:", email);
-      return res.status(400).json({ erro: "Usuário não encontrado!" });
-    }
+    if (!user) return res.status(400).json({ erro: "Usuário não encontrado!" });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      console.log("Senha incorreta para email:", email);
-      return res.status(400).json({ erro: "Senha incorreta!" });
-    }
+    if (!valid) return res.status(400).json({ erro: "Senha incorreta!" });
 
     const token = jwt.sign({ id: user._id, email: user.email, name: user.name }, SECRET, { expiresIn: "2h" });
-    console.log("Token gerado para usuário:", email);
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -130,22 +123,27 @@ app.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Erro no login:", err);
-    return res.status(500).json({ erro: "Login Error" });
+    return res.status(500).json({ erro: "Erro no login" });
   }
 });
 
+// Página protegida
 app.get("/willkommen", authenticate, (req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, "willkommen.html"));
 });
+
+// Dados do usuário logado
 app.get("/api/me", authenticate, (req, res) => {
   return res.json({ id: req.user.id, email: req.user.email, name: req.user.name });
 });
 
+// Logout
 app.post("/logout", (req, res) => {
   res.clearCookie("token");
   return res.json({ mensagem: "Logout realizado com sucesso!" });
 });
 
+// Inicia o servidor
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta http://localhost:${PORT}`);
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
