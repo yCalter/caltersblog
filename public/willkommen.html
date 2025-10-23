@@ -7,43 +7,117 @@
   <link rel="stylesheet" href="/style/willkommen.css">
 </head>
 <body>
-  <h1 style="text-align: center;">Bem-vindo ao meu blog!</h1>
+  <h1 style="text-align: center;">Bem-vindo ao Calter's Blog !</h1>
   <p style="text-align: center;">Aqui você encontra as principais atualizações da minha vida!</p>
 
   <div style="text-align: center; margin-top: 30px;">
     <button onclick="logout()">Sair</button>
   </div>
 
+  <hr>
+
+  <section style="max-width: 700px; margin: 30px auto; text-align: center;">
+    <h2> Criar novo post</h2>
+    <form id="formPost">
+      <input type="text" id="titulo" placeholder="Título do post" required style="width: 100%; margin-bottom: 10px;">
+      <textarea id="conteudo" placeholder="Escreva seu post..." required style="width: 100%; height: 100px;"></textarea>
+      <button type="submit">Publicar</button>
+    </form>
+  </section>
+
+  <section style="max-width: 700px; margin: 30px auto;">
+    <h2 style="text-align: center;">Ultimos posts</h2>
+    <div id="posts"></div>
+  </section>
+
   <script>
+    // 🔒 Verifica autenticação
     async function verificarAutenticacao() {
       const token = localStorage.getItem("token");
       if (!token) {
-        window.location.href = "/index.html";
+        window.location.href = "/login.html";
         return;
       }
 
       try {
-        const res = await fetch("/willkommen", {
+        const res = await fetch("/api/me", {
           headers: { "Authorization": `Bearer ${token}` }
         });
 
         if (!res.ok) {
           localStorage.removeItem("token");
-          window.location.href = "/index.html";
+          window.location.href = "/login.html";
         }
       } catch (err) {
         console.error("Erro ao verificar login:", err);
         localStorage.removeItem("token");
-        window.location.href = "/index.html";
+        window.location.href = "/login.html";
       }
     }
 
     verificarAutenticacao();
 
+    // 🚪 Logout
     function logout() {
       localStorage.removeItem("token");
-      window.location.href = "/index.html";
+      fetch("/logout", { method: "POST" });
+      window.location.href = "/login.html";
     }
+
+    // 📰 CRUD de Posts
+    const token = localStorage.getItem("token");
+
+    async function carregarPosts() {
+      const res = await fetch("/api/posts");
+      const posts = await res.json();
+
+      const container = document.getElementById("posts");
+      container.innerHTML = posts.length
+        ? posts.map(p => `
+            <article style="border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+              <h3>${p.title}</h3>
+              <p>${p.content}</p>
+              <small>por ${p.author?.name || "Anônimo"} em ${new Date(p.createdAt).toLocaleDateString()}</small><br>
+              <button onclick="deletarPost('${p._id}')">🗑️ Deletar</button>
+            </article>
+          `).join("")
+        : "<p>Nenhum post ainda.</p>";
+    }
+
+    document.getElementById("formPost").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const titulo = document.getElementById("titulo").value;
+      const conteudo = document.getElementById("conteudo").value;
+
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: titulo, content: conteudo })
+      });
+
+      if (res.ok) {
+        alert("Post criado com sucesso!");
+        document.getElementById("titulo").value = "";
+        document.getElementById("conteudo").value = "";
+        carregarPosts();
+      } else {
+        alert("Erro ao criar post.");
+      }
+    });
+
+    async function deletarPost(id) {
+      if (!confirm("Tem certeza que deseja deletar este post?")) return;
+      await fetch(`/api/posts/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      carregarPosts();
+    }
+
+    carregarPosts();
   </script>
 </body>
 </html>
